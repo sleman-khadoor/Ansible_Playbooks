@@ -1,0 +1,130 @@
+---
+- name: LAMPstack_phpmyadmin_LaravelDependencies
+  hosts: [ansible_client]
+  remote_user: "{{Here you put the user name of the server}}"
+  become_user: root
+  become: true
+
+  vars:
+    php_version: "7.4"
+    php_versions_install_recommends: false
+    
+ 
+  tasks:
+# Adding universe repository for phpmyadmin setup
+   - name: Enable universe repository
+     apt_repository:
+       repo: "{{ item }}"
+     loop:
+       - "deb http://archive.ubuntu.com/ubuntu/ bionic universe"
+       - "deb http://archive.ubuntu.com/ubuntu/ bionic-updates universe"
+       - "deb http://security.ubuntu.com/ubuntu/ bionic-security universe"
+  
+# Installing Apache2 web server with Mysql database
+   - name: install Apache,Msql
+     apt:
+       name:
+        # dependencies befor installing apache2
+         - git
+         - curl
+         - wget
+         - zip
+         - unzip
+        # apache 2
+         - apache2
+        # mysql
+         - mysql-server
+         - mysql-client
+       update_cache: yes
+       state: present
+
+# Adding ondrej/php Repository to install php7.4
+   - name: Adding php repo
+     become: true
+     apt_repository:
+       repo: 'ppa:ondrej/php'
+
+
+# Installing php7.4
+   - name: install php
+     become: true 
+     apt:
+       name:
+         - php7.4
+       update_cache: yes
+       state: present
+
+# Installing Laraver needed packages
+   - name: install dependencies for laravel
+     apt:
+       name:
+         - libapache2-mod-php7.4
+         - php7.4-mysql 
+         - php7.4-common
+         - php7.4-intl      
+         - php7.4-cli
+         - php7.4-gd
+         - php7.4-mysql
+         - php7.4-curl
+         - php7.4-intl
+         - php7.4-mbstring
+         - php7.4-xml
+         - php7.4-zip
+         - php7.4-bz2
+         - php7.4-readline 
+         - php7.4-json
+       update_cache: yes
+       state: present
+
+# Installing phpMyadmin
+   - name: install phpmyadmin
+     apt:
+       name:
+         - php-gettext
+         - phpmyadmin
+       update_cache: yes
+       state: present
+# Installing pip
+   - name: install pip
+     apt:
+       name:
+         - python3-pip
+       state: latest
+
+   - name: Make sure pymysql is present
+     become: true # needed if the other tasks are not played as root
+     pip:
+       name: pymysql
+       state: present
+       
+# Starting Apache2
+   - name: Enabling and Starting the service httpd
+     service:
+       name: apache2
+       enabled: yes
+
+# Starting Mysql Service
+   - name: Enabling and starting the service Mysql
+     service:
+       name: mysql
+       enabled: yes
+       state: started
+
+# create simpolic link for phpMyadmin in /var/www/html folder 
+   - name: create simpolic link
+     ansible.builtin.file: 
+       dest: "/var/www/html/phpmyadmin"
+       src: "/usr/share/phpmyadmin"
+       state: link 
+
+
+
+#Creating new user named dbuser with all priviliges to be used with phpmyadmin 
+   - name: Set MySQL root password
+     mysql_user:
+       login_unix_socket: /var/run/mysqld/mysqld.sock
+       name: 'dbuser'
+       priv: "*.*:ALL,GRANT"
+       state: present
+     become: yes
+
